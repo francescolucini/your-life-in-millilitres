@@ -73,7 +73,7 @@ const scene = new THREE.Scene();
   img.onload = () => {
     const bc = document.createElement('canvas'); bc.width = img.width; bc.height = img.height;
     const bx = bc.getContext('2d');
-    bx.filter = 'blur(32px)';
+    bx.filter = 'blur(56px)';
     bx.save();
     bx.translate(img.width / 2, img.height / 2);
     bx.rotate(-0.03);
@@ -445,7 +445,7 @@ const beerFoam = new THREE.Group();
 const foamBody = new THREE.Mesh(new THREE.CylinderGeometry(BEER_R + 0.03, BEER_R, 0.11, 48), matFoam);
 foamBody.position.y = 0.055;
 const foamDome = new THREE.Mesh(new THREE.SphereGeometry(BEER_R + 0.03, 40, 20, 0, Math.PI * 2, 0, Math.PI * 0.5), matFoamTop);
-roughenGeometry(foamDome.geometry, 0.22);
+roughenGeometry(foamDome.geometry, 0.05);
 foamDome.position.y = 0.10; foamDome.scale.y = 0.5;
 const foamDomeBase = foamDome.geometry.attributes.position.array.slice();
 beerFoam.add(foamBody, foamDome);
@@ -535,11 +535,15 @@ machine.add(glassMesh);
 const glassBottom = new THREE.Mesh(new THREE.CylinderGeometry(GLASS.rBot, GLASS.rBot * 0.96, 0.03, 48), matPlastic);
 glassBottom.position.set(GLASS_X, GLASS_BASE_Y + 0.015, GLASS_Z);
 machine.add(glassBottom);
-// beer in glass — tapered to match glass shape, same translucent material as tank
-const glassBeerGeo = new THREE.CylinderGeometry(GLASS.innerTop, GLASS.innerBot, GLASS.innerH, 40);
+// beer in glass — straight cylinder with bottom radius so it never pokes through the tapered glass
+const matBeerInGlass = new THREE.MeshStandardMaterial({
+  color: 0xd4922e, metalness: 0, roughness: 0.15,
+  transparent: true, opacity: 0.78,
+  emissive: 0x5a2e00, emissiveIntensity: 0.3,
+});
+const glassBeerGeo = new THREE.CylinderGeometry(GLASS.innerBot - 0.003, GLASS.innerBot - 0.005, GLASS.innerH, 40);
 glassBeerGeo.translate(0, GLASS.innerH / 2, 0);
-applyBeerGradient(glassBeerGeo);
-const glassBeer = new THREE.Mesh(glassBeerGeo, matBeer);
+const glassBeer = new THREE.Mesh(glassBeerGeo, matBeerInGlass);
 glassBeer.position.set(GLASS_X, GLASS_FLOOR_Y, GLASS_Z);
 machine.add(glassBeer);
 // backlight for glass beer transmission
