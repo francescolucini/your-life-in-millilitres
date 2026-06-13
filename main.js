@@ -73,9 +73,12 @@ const scene = new THREE.Scene();
   img.onload = () => {
     const bc = document.createElement('canvas'); bc.width = img.width; bc.height = img.height;
     const bx = bc.getContext('2d');
-    bx.filter = 'blur(16px)';
+    bx.filter = 'blur(32px)';
     bx.save();
-    bx.setTransform(1.08, 0.012, 0, 1.05, -img.width * 0.04, -img.height * 0.025);
+    bx.translate(img.width / 2, img.height / 2);
+    bx.rotate(-0.03);
+    bx.scale(1.15, 1.08);
+    bx.translate(-img.width / 2, -img.height / 2);
     bx.drawImage(img, 0, 0);
     bx.restore();
     const bgTex = new THREE.CanvasTexture(bc);
@@ -112,12 +115,12 @@ new THREE.TextureLoader().load('./assets/delft.jpeg', (t) => {
 
 // Lights
 scene.add(new THREE.HemisphereLight(0xb8cfe0, 0xb39a7a, 0.55));
-const key = new THREE.DirectionalLight(0xd4e2f2, 2.0);
-key.position.set(5, 5.5, 4);
+const key = new THREE.DirectionalLight(0xc8daf0, 2.2);
+key.position.set(12, 2.8, 0.3);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 key.shadow.camera.near = 1; key.shadow.camera.far = 30;
-key.shadow.camera.left = -3.5; key.shadow.camera.right = 3.5;
+key.shadow.camera.left = -5; key.shadow.camera.right = 5;
 key.shadow.camera.top = 6; key.shadow.camera.bottom = -1.5;
 key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
 scene.add(key);
@@ -176,11 +179,12 @@ matBeer.onBeforeCompile = (shader) => {
     totalEmissiveRadiance += vec3(0.95, 0.52, 0.16) * beerFres * 1.4;`
   );
 };
-const matStream = new THREE.MeshStandardMaterial({ color: 0xe6a51a, metalness: 0, roughness: 0.2, emissive: 0x6b3300, emissiveIntensity: 0.4 });
-const matFoam = new THREE.MeshStandardMaterial({ color: 0xf0e8d2, roughness: 1.0, metalness: 0, emissive: 0x161009, emissiveIntensity: 0.15 });
-const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xf0e8d2, roughness: 1.0, metalness: 0, emissive: 0x161009, emissiveIntensity: 0.15 });
+const matStream = new THREE.MeshStandardMaterial({ color: 0xe8be52, metalness: 0, roughness: 0.35, emissive: 0x8a5a18, emissiveIntensity: 0.25 });
+const matFoam = new THREE.MeshStandardMaterial({ color: 0xfaf5e8, roughness: 0.95, metalness: 0 });
+const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xfcf8ee, roughness: 0.92, metalness: 0 });
 // Transparent plastic cup (festival-style) — softer/cheaper than glass
-const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe4e6e8, metalness: 0, roughness: 0.38, transmission: 0, transparent: true, opacity: 0.2, ior: 1.42, clearcoat: 0.06, clearcoatRoughness: 0.65, depthWrite: false, envMapIntensity: 0.2 });
+const scratchTex = makeScratchTexture();
+const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe4e6e8, metalness: 0, roughness: 0.42, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.003, transmission: 0, transparent: true, opacity: 0.18, ior: 1.42, clearcoat: 0.04, clearcoatRoughness: 0.7, depthWrite: false, envMapIntensity: 0.15 });
 // Beer poured into the cup — opaque amber so it reads clearly (no transmission flicker)
 const matBeerGlass = new THREE.MeshStandardMaterial({ color: 0xdca238, metalness: 0, roughness: 0.25, emissive: 0x7a4200, emissiveIntensity: 0.4 });
 
@@ -336,6 +340,28 @@ function makeBrushedTexture() {
   t.anisotropy = 8;
   return t;
 }
+function makeScratchTexture() {
+  const cv = document.createElement('canvas'); cv.width = 512; cv.height = 512;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#808080'; x.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 350; i++) {
+    const sx = Math.random() * 512, sy = Math.random() * 512;
+    const ex = sx + (Math.random() - 0.5) * 70, ey = sy + (Math.random() - 0.5) * 70;
+    x.strokeStyle = `rgba(185,185,185,${0.08 + Math.random() * 0.22})`;
+    x.lineWidth = 0.3 + Math.random() * 0.7;
+    x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
+  }
+  for (let i = 0; i < 20; i++) {
+    const sx = Math.random() * 512, sy = Math.random() * 512;
+    const ex = sx + (Math.random() - 0.5) * 35, ey = sy + (Math.random() - 0.5) * 35;
+    x.strokeStyle = 'rgba(210,210,210,0.35)';
+    x.lineWidth = 0.6 + Math.random() * 1.4;
+    x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3);
+  t.colorSpace = THREE.NoColorSpace; return t;
+}
 const matDarkPanel = new THREE.MeshStandardMaterial({ color: 0x0b0c0f, metalness: 0.3, roughness: 0.6 });
 
 // =====================================================================
@@ -397,6 +423,22 @@ const backGlow = new THREE.Mesh(
 );
 backGlow.position.set(0, TANK_INNER_BOTTOM + TANK_INNER_H / 2, -0.30);
 machine.add(backGlow);
+
+// Foam residue rings left on tank wall as beer drops
+const matFoamRing = new THREE.MeshStandardMaterial({ color: 0xf5edd6, roughness: 1.0, metalness: 0, transparent: true, opacity: 0.4, depthWrite: false });
+const foamRingFracs = [0.88, 0.72, 0.55, 0.38, 0.22];
+const foamRings = foamRingFracs.map(frac => {
+  const y = TANK_INNER_BOTTOM + TANK_INNER_H * frac;
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(BEER_R + 0.01, 0.008, 8, 48),
+    matFoamRing
+  );
+  ring.position.set(0, y, 0);
+  ring.rotation.x = Math.PI / 2;
+  ring.visible = false;
+  machine.add(ring);
+  return { mesh: ring, frac };
+});
 
 // Foam head: cylindrical body + domed top
 const beerFoam = new THREE.Group();
@@ -482,8 +524,8 @@ const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.02, 0.24, 20), 
 lever.position.set(0, 0.12, 0);
 leverPivot.add(lever);
 const matRubber = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0.9, metalness: 0 });
-const leverKnob = new THREE.Mesh(new THREE.CapsuleGeometry(0.032, 0.08, 6, 16), matRubber);
-leverKnob.position.set(0, 0.26, 0);
+const leverKnob = new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.22, 6, 16), matRubber);
+leverKnob.position.set(0, 0.32, 0);
 leverPivot.add(leverKnob);
 
 // --- Drinking glass ---
@@ -493,28 +535,62 @@ machine.add(glassMesh);
 const glassBottom = new THREE.Mesh(new THREE.CylinderGeometry(GLASS.rBot, GLASS.rBot * 0.96, 0.03, 48), matPlastic);
 glassBottom.position.set(GLASS_X, GLASS_BASE_Y + 0.015, GLASS_Z);
 machine.add(glassBottom);
-// beer in glass
-const glassBeerGeo = new THREE.CylinderGeometry(0.15, 0.146, GLASS.innerH, 40);
+// beer in glass — tapered to match glass shape, same translucent material as tank
+const glassBeerGeo = new THREE.CylinderGeometry(GLASS.innerTop, GLASS.innerBot, GLASS.innerH, 40);
 glassBeerGeo.translate(0, GLASS.innerH / 2, 0);
-const glassBeer = new THREE.Mesh(glassBeerGeo, matBeerGlass);
+applyBeerGradient(glassBeerGeo);
+const glassBeer = new THREE.Mesh(glassBeerGeo, matBeer);
 glassBeer.position.set(GLASS_X, GLASS_FLOOR_Y, GLASS_Z);
 machine.add(glassBeer);
+// backlight for glass beer transmission
+const glassBackGlow = new THREE.Mesh(
+  new THREE.PlaneGeometry(0.28, GLASS.innerH),
+  new THREE.MeshBasicMaterial({ color: 0xd9a050 })
+);
+glassBackGlow.position.set(GLASS_X, GLASS_FLOOR_Y + GLASS.innerH / 2, GLASS_Z - 0.16);
+glassBackGlow.visible = false;
+machine.add(glassBackGlow);
 const glassFoam = new THREE.Group();
-const gFoamBody = new THREE.Mesh(new THREE.CylinderGeometry(0.146, 0.143, 0.009, 40), matFoam);
-gFoamBody.position.y = 0.004;
+const gFoamBody = new THREE.Mesh(new THREE.CylinderGeometry(GLASS.innerTop - 0.005, GLASS.innerBot + 0.005, 0.012, 40), matFoam);
+gFoamBody.position.y = 0.006;
 glassFoam.add(gFoamBody);
 glassFoam.position.set(GLASS_X, GLASS_FLOOR_Y, GLASS_Z);
 machine.add(glassFoam);
+// carbonation bubbles in glass
+const GLASS_BUBBLES = 35;
+const glassBubblePos = new Float32Array(GLASS_BUBBLES * 3), glassBubbleSpd = new Float32Array(GLASS_BUBBLES);
+const bubbleTex = makeBubbleTexture();
+function seedGlassBubble(i, y) {
+  const r = 0.10 * Math.sqrt(Math.random()), a = Math.random() * Math.PI * 2;
+  glassBubblePos[i * 3] = Math.cos(a) * r; glassBubblePos[i * 3 + 1] = y; glassBubblePos[i * 3 + 2] = Math.sin(a) * r;
+  glassBubbleSpd[i] = 0.06 + Math.random() * 0.18;
+}
+for (let i = 0; i < GLASS_BUBBLES; i++) seedGlassBubble(i, Math.random() * GLASS.innerH * 0.4);
+const glassBubbleGeo = new THREE.BufferGeometry();
+glassBubbleGeo.setAttribute('position', new THREE.BufferAttribute(glassBubblePos, 3));
+const glassBubbles = new THREE.Points(glassBubbleGeo, new THREE.PointsMaterial({
+  size: 0.028, map: bubbleTex, transparent: true, opacity: 0.55,
+  depthTest: false, depthWrite: false, sizeAttenuation: true,
+}));
+glassBubbles.position.set(GLASS_X, GLASS_FLOOR_Y, GLASS_Z);
+glassBubbles.renderOrder = 12;
+glassBubbles.visible = false;
+machine.add(glassBubbles);
 // glass tray
 const tray = new THREE.Mesh(new RoundedBoxGeometry(0.55, 0.04, 0.34, 3, 0.02), matMetalTrim);
 tray.position.set(0, GLASS_BASE_Y - 0.02, FRONT_Z + 0.14);
 machine.add(tray);
 
-// --- Pour stream ---
-const pourStream = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 1, 10), matStream);
+// --- Pour stream (thicker, with foamy sheath) ---
+const pourStream = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.014, 1, 14), matStream);
 pourStream.position.set(GLASS_X, 0.6, GLASS_Z);
 pourStream.visible = false;
+const matStreamFoam = new THREE.MeshStandardMaterial({ color: 0xf5edd6, metalness: 0, roughness: 0.8, transparent: true, opacity: 0.45 });
+const pourFoam = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.02, 1, 12), matStreamFoam);
+pourFoam.position.set(GLASS_X, 0.6, GLASS_Z);
+pourFoam.visible = false;
 machine.add(pourStream);
+machine.add(pourFoam);
 
 // =====================================================================
 // MICRO DETAILS
@@ -591,6 +667,7 @@ function setTankLevel(ml) {
   backGlow.scale.y = Math.max(f, 0.0001);
   backGlow.position.y = TANK_INNER_BOTTOM + TANK_INNER_H * f / 2;
   backGlow.visible = f > 0.01;
+  for (const ring of foamRings) ring.mesh.visible = f < ring.frac && f > 0.01;
 }
 function glassFillHeight(ml) {
   return Math.min((ml / TOTAL_ML) * TANK_INNER_H, GLASS.innerH);
@@ -602,16 +679,32 @@ function setGlassLevel(ml) {
   glassFoam.position.y = top;
   glassFoam.visible = ml > 1;
   glassBeer.visible = ml > 0.2;
+  glassBackGlow.visible = ml > 1;
+  glassBackGlow.scale.y = Math.max(h / GLASS.innerH, 0.0001);
+  glassBackGlow.position.y = GLASS_FLOOR_Y + h / 2;
+}
+function updateGlassBubbles(dt) {
+  if (state.glassMl <= 1) { glassBubbles.visible = false; return; }
+  glassBubbles.visible = true;
+  const h = glassFillHeight(state.glassMl);
+  for (let i = 0; i < GLASS_BUBBLES; i++) {
+    glassBubblePos[i * 3 + 1] += glassBubbleSpd[i] * dt;
+    if (glassBubblePos[i * 3 + 1] > h - 0.02) seedGlassBubble(i, 0.01 + Math.random() * 0.03);
+  }
+  glassBubbleGeo.attributes.position.needsUpdate = true;
 }
 function updatePourStream() {
   const pouring = state.phase === 'pouring' && state.isHolding && state.tankMl > 0.05;
   pourStream.visible = pouring;
+  pourFoam.visible = pouring;
   if (pouring) {
     const gTop = GLASS_FLOOR_Y + glassFillHeight(state.glassMl);
     const top = SPOUT_TIP_Y;
     const h = Math.max(top - gTop, 0.02);
     pourStream.scale.y = h;
     pourStream.position.y = gTop + h / 2;
+    pourFoam.scale.y = h;
+    pourFoam.position.y = gTop + h / 2;
   }
 }
 
@@ -830,6 +923,7 @@ function update(dt) {
   setGlassLevel(state.glassMl);
   updatePourStream();
   updateBubbles(dt);
+  updateGlassBubbles(dt);
   // foam undulation (waves across the head)
   const fpos = foamDome.geometry.attributes.position;
   for (let i = 0; i < fpos.count; i++) {
