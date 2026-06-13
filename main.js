@@ -73,8 +73,11 @@ const scene = new THREE.Scene();
   img.onload = () => {
     const bc = document.createElement('canvas'); bc.width = img.width; bc.height = img.height;
     const bx = bc.getContext('2d');
-    bx.filter = 'blur(7px)';
+    bx.filter = 'blur(16px)';
+    bx.save();
+    bx.setTransform(1.08, 0.012, 0, 1.05, -img.width * 0.04, -img.height * 0.025);
     bx.drawImage(img, 0, 0);
+    bx.restore();
     const bgTex = new THREE.CanvasTexture(bc);
     bgTex.colorSpace = THREE.SRGBColorSpace;
     scene.background = bgTex;
@@ -109,8 +112,8 @@ new THREE.TextureLoader().load('./assets/delft.jpeg', (t) => {
 
 // Lights
 scene.add(new THREE.HemisphereLight(0xb8cfe0, 0xb39a7a, 0.55));
-const key = new THREE.DirectionalLight(0xffe6bf, 2.0);
-key.position.set(-5, 5.5, 4);
+const key = new THREE.DirectionalLight(0xd4e2f2, 2.0);
+key.position.set(5, 5.5, 4);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
 key.shadow.camera.near = 1; key.shadow.camera.far = 30;
@@ -118,8 +121,8 @@ key.shadow.camera.left = -3.5; key.shadow.camera.right = 3.5;
 key.shadow.camera.top = 6; key.shadow.camera.bottom = -1.5;
 key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
 scene.add(key);
-const rim = new THREE.DirectionalLight(0xbcd2f0, 0.5);
-rim.position.set(4, 5, -5);
+const rim = new THREE.DirectionalLight(0xe8d8c0, 0.5);
+rim.position.set(-4, 5, -5);
 scene.add(rim);
 const tankGlow = new THREE.PointLight(0xffcf6b, 45, 11, 2);
 tankGlow.position.set(0, 3.4, -0.6);
@@ -132,7 +135,7 @@ scene.add(nicheLight);
 // Light-oak tabletop with bevelled edges
 const tableTex = makeTableTextures();
 const table = new THREE.Mesh(
-  new RoundedBoxGeometry(5.4, 0.14, 2.4, 5, 0.02),
+  new RoundedBoxGeometry(7.5, 0.14, 3.2, 6, 0.06),
   new THREE.MeshStandardMaterial({
     map: tableTex.color,
     roughnessMap: tableTex.rough,
@@ -159,11 +162,11 @@ const matGlass = new THREE.MeshPhysicalMaterial({
   ior: 1.5, thickness: 0.5, transparent: true, envMapIntensity: 1.7,
 });
 const matBeer = new THREE.MeshPhysicalMaterial({
-  vertexColors: true, color: 0xffffff, metalness: 0.0, roughness: 0.1,
-  transmission: 0.8, ior: 1.33, thickness: 0.45,
-  attenuationColor: new THREE.Color(0x9a5512), attenuationDistance: 0.35,
-  transparent: true, clearcoat: 0.3, clearcoatRoughness: 0.25,
-  emissive: 0x3a2200, emissiveIntensity: 0.12,
+  vertexColors: true, color: 0xffffff, metalness: 0.0, roughness: 0.05,
+  transmission: 0.93, ior: 1.34, thickness: 0.28,
+  attenuationColor: new THREE.Color(0xb8711a), attenuationDistance: 0.6,
+  transparent: true, clearcoat: 0.15, clearcoatRoughness: 0.12,
+  emissive: 0x3a2200, emissiveIntensity: 0.05,
 });
 matBeer.onBeforeCompile = (shader) => {
   shader.fragmentShader = shader.fragmentShader.replace(
@@ -177,7 +180,7 @@ const matStream = new THREE.MeshStandardMaterial({ color: 0xe6a51a, metalness: 0
 const matFoam = new THREE.MeshStandardMaterial({ color: 0xf0e8d2, roughness: 1.0, metalness: 0, emissive: 0x161009, emissiveIntensity: 0.15 });
 const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xf0e8d2, roughness: 1.0, metalness: 0, emissive: 0x161009, emissiveIntensity: 0.15 });
 // Transparent plastic cup (festival-style) — softer/cheaper than glass
-const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xeef0f2, metalness: 0, roughness: 0.12, transmission: 0, transparent: true, opacity: 0.34, ior: 1.46, clearcoat: 0.4, clearcoatRoughness: 0.2, depthWrite: false, envMapIntensity: 0.6 });
+const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe4e6e8, metalness: 0, roughness: 0.38, transmission: 0, transparent: true, opacity: 0.2, ior: 1.42, clearcoat: 0.06, clearcoatRoughness: 0.65, depthWrite: false, envMapIntensity: 0.2 });
 // Beer poured into the cup — opaque amber so it reads clearly (no transmission flicker)
 const matBeerGlass = new THREE.MeshStandardMaterial({ color: 0xdca238, metalness: 0, roughness: 0.25, emissive: 0x7a4200, emissiveIntensity: 0.4 });
 
@@ -478,7 +481,8 @@ tap.add(leverPivot);
 const lever = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.02, 0.24, 20), matMetalTrim);
 lever.position.set(0, 0.12, 0);
 leverPivot.add(lever);
-const leverKnob = new THREE.Mesh(new THREE.SphereGeometry(0.045, 20, 16), matMetalTrim);
+const matRubber = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0.9, metalness: 0 });
+const leverKnob = new THREE.Mesh(new THREE.CapsuleGeometry(0.032, 0.08, 6, 16), matRubber);
 leverKnob.position.set(0, 0.26, 0);
 leverPivot.add(leverKnob);
 
@@ -534,23 +538,16 @@ function addScrew(x, y) {
 addScrew(-0.76, 0.18); addScrew(0.76, 0.18); addScrew(-0.76, 2.52); addScrew(0.76, 2.52);
 
 // Engraved brand monogram between screen and niche
-const logoCanvas = document.createElement('canvas'); logoCanvas.width = 512; logoCanvas.height = 96;
+const logoCanvas = document.createElement('canvas'); logoCanvas.width = 1024; logoCanvas.height = 96;
 const lx = logoCanvas.getContext('2d');
-lx.fillStyle = '#41454d'; lx.font = '700 50px "Helvetica Neue", Arial, sans-serif';
+lx.fillStyle = '#41454d'; lx.font = '600 40px "Helvetica Neue", Arial, sans-serif';
 lx.textAlign = 'center'; lx.textBaseline = 'middle';
-lx.fillText('Y L M', 256, 52);
+lx.fillText('Behavioural design', 512, 52);
 const logoTex = new THREE.CanvasTexture(logoCanvas); logoTex.colorSpace = THREE.SRGBColorSpace;
-const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.3, 0.056), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true }));
+const logo = new THREE.Mesh(new THREE.PlaneGeometry(0.64, 0.056), new THREE.MeshBasicMaterial({ map: logoTex, transparent: true }));
 logo.position.set(0, 2.585, FRONT_Z + 0.006);
 machine.add(logo);
 
-// Power LED
-const led = new THREE.Mesh(
-  new THREE.SphereGeometry(0.014, 12, 10),
-  new THREE.MeshStandardMaterial({ color: 0x402a00, emissive: 0xffc24a, emissiveIntensity: 2.4 })
-);
-led.position.set(0.66, 1.47, FRONT_Z + 0.012);
-machine.add(led);
 
 // Cooling vents on the visible (right) side
 for (let i = 0; i < 6; i++) {
@@ -626,6 +623,7 @@ const UI = {
   ageSlider: { x: 200, y: 300, w: 624 },
   slider:    { x: 200, y: 520, w: 624 },
   start:     { x: 312, y: 624, w: 400, h: 96 },
+  restart:   { x: 312, y: 640, w: 400, h: 80 },
 };
 
 function rr(ctx, x, y, w, h, r) {
@@ -718,10 +716,7 @@ function drawScreen() {
       center('with your friends and family.', 380, 36, '#e8e6e0', '600');
     }
     center('Drink it wisely.', 500, 40, '#8a8780', '400');
-    const pulse = 0.5 + 0.5 * Math.sin(t * 3);
-    sctx.globalAlpha = pulse;
-    center('touch to restart', 640, 26, '#5d5b56', '400');
-    sctx.globalAlpha = 1;
+    drawRectBtn(UI.restart, 'RESTART');
   }
   screenTex.needsUpdate = true;
 }
@@ -907,7 +902,10 @@ function onDown(ev) {
     if (hitLever()) { state.isHolding = true; if (state.phase === 'pour_ready') state.phase = 'pouring'; }
     return;
   }
-  if (state.phase === 'done') { resetMachine(); }
+  if (state.phase === 'done') {
+    const p = hitScreen();
+    if (p && inRect(p, UI.restart)) resetMachine();
+  }
 }
 function onMove(ev) {
   setNDC(ev);
