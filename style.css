@@ -1,0 +1,96 @@
+:root {
+  --bg: #050506;
+  --ink: #e8e6e0;
+  --dim: #8a8780;
+  --amber: #e8a317;
+  --line: rgba(255, 255, 255, 0.08);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+body { display: flex; }
+
+#sidebar {
+  width: 340px;
+  min-width: 340px;
+  height: 100vh;
+  padding: 40px 32px;
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+  overflow-y: auto;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent 40%);
+}
+
+#sidebar header h1 {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--amber);
+  font-style: italic;
+}
+
+.sources h2 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--dim);
+  margin-bottom: 14px;
+}
+
+.model-note { font-size: 12.5px; line-height: 1.55; color: var(--dim); margin-bottom: 14px; }
+.model-note strong { color: var(--ink); }
+
+.legend { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.legend li {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; padding-bottom: 7px; border-bottom: 1px solid var(--line);
+}
+.legend li span { color: var(--ink); }
+.legend li em { color: var(--dim); font-style: normal; font-variant-numeric: tabular-nums; }
+.legend li.free { border-bottom: none; padding-top: 4px; }
+.legend li.free span, .legend li.free em { color: var(--amber); font-weight: 600; }
+
+.sources ol { list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 11px; }
+.sources ol li {
+  counter-increment: s;
+  font-size: 12px; line-height: 1.45; color: var(--dim);
+  padding-left: 22px; position: relative;
+}
+.sources ol li::before {
+  content: counter(s);
+  position: absolute; left: 0; top: 0;
+  font-size: 10px; color: var(--amber);
+  border: 1px solid var(--line); border-radius: 50%;
+  width: 15px; height: 15px; display: grid; place-items: center;
+}
+.sources a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.sources a:hover { color: var(--amber); border-color: var(--amber); }
+
+.disclaimer { margin-top: 16px; font-size: 10.5px; line-height: 1.5; color: #5d5b56; font-style: italic; }
+
+#stage { flex: 1; height: 100vh; position: relative; }
+#stage canvas { display: block; width: 100% !important; height: 100% !important; }
+
+@media (max-width: 720px) {
+  body { flex-direction: column; }
+  #sidebar { width: 100%; min-width: 0; height: auto; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--line); }
+  #stage { height: 60vh; }
+}
