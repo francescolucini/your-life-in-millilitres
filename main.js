@@ -130,8 +130,8 @@ scene.add(rim);
 const tankGlow = new THREE.PointLight(0xffcf6b, 45, 11, 2);
 tankGlow.position.set(0, 3.4, -0.6);
 scene.add(tankGlow);
-const nicheLight = new THREE.PointLight(0xffe8c8, 1.6, 4.0, 2);
-nicheLight.position.set(0, 0.78, FRONT_Z + 0.55);
+const nicheLight = new THREE.PointLight(0xffe8c8, 0.5, 2.6, 2);
+nicheLight.position.set(0, 1.0, FRONT_Z - 0.04);
 scene.add(nicheLight);
 
 // Ground
@@ -184,7 +184,7 @@ const matFoam = new THREE.MeshStandardMaterial({ color: 0xfaf5e8, roughness: 0.9
 const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xfcf8ee, roughness: 0.92, metalness: 0 });
 // Transparent plastic cup (festival-style) — softer/cheaper than glass
 const scratchTex = makeScratchTexture();
-const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe4e6e8, metalness: 0, roughness: 0.42, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.006, transmission: 0, transparent: true, opacity: 0.36, ior: 1.42, clearcoat: 0.04, clearcoatRoughness: 0.7, depthWrite: false, envMapIntensity: 0.5 });
+const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe4e6e8, metalness: 0, roughness: 0.52, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.006, transmission: 0, transparent: true, opacity: 0.36, ior: 1.42, clearcoat: 0, depthWrite: false, envMapIntensity: 0.4 });
 // Beer poured into the cup — opaque amber so it reads clearly (no transmission flicker)
 const matBeerGlass = new THREE.MeshStandardMaterial({ color: 0xdca238, metalness: 0, roughness: 0.25, emissive: 0x7a4200, emissiveIntensity: 0.4 });
 
@@ -371,13 +371,41 @@ const machine = new THREE.Group();
 scene.add(machine);
 
 // --- Base cabinet ---
-const base = new THREE.Mesh(new RoundedBoxGeometry(BASE.w, BASE.h, BASE.d, 6, 0.08), matMetalDark);
-base.position.set(0, BASE.h / 2, 0);
+// The body is recessed at the front by NICHE_DEPTH; a 4-piece frame rebuilds
+// the front face around the dispense opening, so there's a real alcove.
+const NICHE_DEPTH = 0.16;
+const NICHE = { w: 0.92, y: 0.75, h: 1.30 }; // opening
+const NICHE_X = NICHE.w / 2;                 // ±0.46
+const NICHE_TOP = NICHE.y + NICHE.h / 2;     // 1.40
+const NICHE_BOT = NICHE.y - NICHE.h / 2;     // 0.10
+const bodyDepth = BASE.d - NICHE_DEPTH;
+const base = new THREE.Mesh(new RoundedBoxGeometry(BASE.w, BASE.h, bodyDepth, 6, 0.08), matMetalDark);
+base.position.set(0, BASE.h / 2, -NICHE_DEPTH / 2);
 machine.add(base);
 
-// Accent strip near top of base
-const strip = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.05, 0.96, 3, 0.02), matAccent);
-strip.position.set(0, BASE.h - 0.02, 0);
+// Front frame (4 slabs) — leaves the niche opening as a hole through to the recessed body
+const frameZ = FRONT_Z - NICHE_DEPTH / 2;
+function frameSlab(w, h, x, y) {
+  const m = new THREE.Mesh(new RoundedBoxGeometry(w, h, NICHE_DEPTH, 4, 0.03), matMetalDark);
+  m.position.set(x, y, frameZ);
+  machine.add(m);
+  return m;
+}
+const sideW = (BASE.w / 2 - NICHE_X);
+frameSlab(sideW, BASE.h, -(NICHE_X + sideW / 2), BASE.h / 2);          // left
+frameSlab(sideW, BASE.h,  (NICHE_X + sideW / 2), BASE.h / 2);          // right
+frameSlab(NICHE.w, BASE.h - NICHE_TOP, 0, (NICHE_TOP + BASE.h) / 2);   // top
+frameSlab(NICHE.w, NICHE_BOT, 0, NICHE_BOT / 2);                       // bottom
+
+// Dark recessed back wall of the alcove
+const matNiche = new THREE.MeshStandardMaterial({ color: 0x15181e, metalness: 0.7, roughness: 0.55, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.003, envMapIntensity: 0.3 });
+const nicheBack = new THREE.Mesh(new THREE.PlaneGeometry(NICHE.w, NICHE.h), matNiche);
+nicheBack.position.set(0, NICHE.y, FRONT_Z - NICHE_DEPTH + 0.004);
+machine.add(nicheBack);
+
+// Accent strip near top of base (sits on the frame face)
+const strip = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.05, 0.06, 3, 0.02), matAccent);
+strip.position.set(0, BASE.h - 0.02, FRONT_Z - 0.01);
 machine.add(strip);
 
 // --- Tank cradle ring on top of base ---
@@ -440,20 +468,19 @@ const foamRings = foamRingFracs.map(frac => {
   return { mesh: ring, frac };
 });
 
-// Foam head: single dome + flat cap (no visible layers)
+// Foam head: skirt (dips into beer, no gap) + single dome (no visible layers)
 const beerFoam = new THREE.Group();
+const foamSkirt = new THREE.Mesh(new THREE.CylinderGeometry(BEER_R + 0.02, BEER_R, 0.09, 40), matFoam);
+foamSkirt.position.y = -0.03; // overlaps the beer surface so no see-through band
 const foamDome = new THREE.Mesh(
   new THREE.SphereGeometry(BEER_R + 0.02, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.5),
   matFoamTop
 );
 roughenGeometry(foamDome.geometry, 0.04);
-foamDome.scale.y = 0.65;
-foamDome.position.y = 0;
+foamDome.scale.y = 0.6;
+foamDome.position.y = 0.012;
 const foamDomeBase = foamDome.geometry.attributes.position.array.slice();
-const foamCap = new THREE.Mesh(new THREE.CircleGeometry(BEER_R + 0.02, 40), matFoam);
-foamCap.rotation.x = -Math.PI / 2;
-foamCap.position.y = 0;
-beerFoam.add(foamDome, foamCap);
+beerFoam.add(foamSkirt, foamDome);
 machine.add(beerFoam);
 
 // Carbonation bubbles rising through the beer column
@@ -503,29 +530,6 @@ machine.add(screenMesh);
 const bezel = new THREE.Mesh(new RoundedBoxGeometry(SCREEN_W + 0.12, SCREEN_H + 0.12, 0.06, 4, 0.03), matMetalTrim);
 bezel.position.set(0, 2.0, FRONT_Z - 0.005);
 machine.add(bezel);
-
-// --- Dispense niche (recessed alcove in the cabinet body) ---
-const matNiche = new THREE.MeshStandardMaterial({ color: 0x1a1e26, metalness: 0.75, roughness: 0.6, envMapIntensity: 0.35 });
-const nicheDepth = 0.10;
-const nicheBack = new THREE.Mesh(new THREE.PlaneGeometry(0.92, 1.28), matNiche);
-nicheBack.position.set(0, 0.74, FRONT_Z - nicheDepth + 0.005);
-machine.add(nicheBack);
-const nicheCeil = new THREE.Mesh(new THREE.PlaneGeometry(0.92, nicheDepth), matNiche);
-nicheCeil.rotation.x = Math.PI / 2;
-nicheCeil.position.set(0, 0.74 + 0.64, FRONT_Z - nicheDepth / 2 + 0.005);
-machine.add(nicheCeil);
-const nicheFloor = new THREE.Mesh(new THREE.PlaneGeometry(0.92, nicheDepth), matNiche);
-nicheFloor.rotation.x = -Math.PI / 2;
-nicheFloor.position.set(0, 0.74 - 0.64, FRONT_Z - nicheDepth / 2 + 0.005);
-machine.add(nicheFloor);
-const nicheSideL = new THREE.Mesh(new THREE.PlaneGeometry(nicheDepth, 1.28), matNiche);
-nicheSideL.rotation.y = Math.PI / 2;
-nicheSideL.position.set(-0.46, 0.74, FRONT_Z - nicheDepth / 2 + 0.005);
-machine.add(nicheSideL);
-const nicheSideR = new THREE.Mesh(new THREE.PlaneGeometry(nicheDepth, 1.28), matNiche);
-nicheSideR.rotation.y = -Math.PI / 2;
-nicheSideR.position.set(0.46, 0.74, FRONT_Z - nicheDepth / 2 + 0.005);
-machine.add(nicheSideR);
 
 // --- Tap (bar tap with lever) ---
 const tap = new THREE.Group();
@@ -578,17 +582,16 @@ glassBackGlow.position.set(GLASS_X, GLASS_FLOOR_Y + GLASS.innerH / 2, GLASS_Z - 
 glassBackGlow.visible = false;
 machine.add(glassBackGlow);
 const glassFoam = new THREE.Group();
+const GFOAM_R = GLASS.innerTop - 0.004; // built at the widest radius, scaled down per frame
 const gFoamDome = new THREE.Mesh(
-  new THREE.SphereGeometry(GLASS.innerBot - 0.005, 24, 12, 0, Math.PI * 2, 0, Math.PI * 0.5),
+  new THREE.SphereGeometry(GFOAM_R, 28, 14, 0, Math.PI * 2, 0, Math.PI * 0.5),
   matFoamTop
 );
 roughenGeometry(gFoamDome.geometry, 0.04);
-gFoamDome.scale.y = 0.25;
-gFoamDome.position.y = 0.003;
+gFoamDome.scale.y = 0.22;
 const gFoamDomeBase = gFoamDome.geometry.attributes.position.array.slice();
-const gFoamCap = new THREE.Mesh(new THREE.CircleGeometry(GLASS.innerBot - 0.005, 24), matFoam);
+const gFoamCap = new THREE.Mesh(new THREE.CircleGeometry(GFOAM_R, 28), matFoam);
 gFoamCap.rotation.x = -Math.PI / 2;
-gFoamCap.position.y = 0.003;
 glassFoam.add(gFoamDome, gFoamCap);
 glassFoam.position.set(GLASS_X, GLASS_FLOOR_Y, GLASS_Z);
 machine.add(glassFoam);
@@ -706,26 +709,38 @@ function setTankLevel(ml) {
   for (const ring of foamRings) ring.mesh.visible = f < ring.frac && f > 0.01;
 }
 function glassFillHeight(ml) {
-  return Math.min((ml / TOTAL_ML) * TANK_INNER_H, GLASS.innerH);
+  // 330 ml maps to a full glass; 89 ml → ~27% (just under a third)
+  return THREE.MathUtils.clamp((ml / TOTAL_ML) * GLASS.innerH, 0, GLASS.innerH);
 }
+let lastGlassMl = -1;
 function setGlassLevel(ml) {
   const h = glassFillHeight(ml);
   if (ml > 0.2) {
     glassBeer.visible = true;
-    const fillFrac = THREE.MathUtils.clamp(h / GLASS.innerH, 0.001, 1);
-    const rTop = GLASS.innerBot + (GLASS.innerTop - GLASS.innerBot) * fillFrac - 0.003;
-    const rBot = GLASS.innerBot - 0.003;
-    glassBeer.geometry.dispose();
-    const hh = Math.max(h, 0.001);
-    const geo = new THREE.CylinderGeometry(rTop, rBot, hh, 40);
-    geo.translate(0, hh / 2, 0);
-    glassBeer.geometry = geo;
+    // rebuild the tapered beer column only when the level actually changed
+    if (Math.abs(ml - lastGlassMl) > 0.05) {
+      const fillFrac = THREE.MathUtils.clamp(h / GLASS.innerH, 0.001, 1);
+      const rTop = GLASS.innerBot + (GLASS.innerTop - GLASS.innerBot) * fillFrac - 0.003;
+      const rBot = GLASS.innerBot - 0.003;
+      glassBeer.geometry.dispose();
+      const hh = Math.max(h, 0.001);
+      const geo = new THREE.CylinderGeometry(rTop, rBot, hh, 40);
+      geo.translate(0, hh / 2, 0);
+      glassBeer.geometry = geo;
+      lastGlassMl = ml;
+    }
   } else {
     glassBeer.visible = false;
+    lastGlassMl = -1;
   }
   const top = GLASS_FLOOR_Y + h;
   glassFoam.position.y = top;
   glassFoam.visible = ml > 1;
+  // foam widens to match the glass wall at the current fill height
+  const fillFrac2 = THREE.MathUtils.clamp(h / GLASS.innerH, 0, 1);
+  const rTopFoam = GLASS.innerBot + (GLASS.innerTop - GLASS.innerBot) * fillFrac2 - 0.003;
+  const foamScale = rTopFoam / GFOAM_R;
+  glassFoam.scale.set(foamScale, 1, foamScale);
   glassBackGlow.visible = ml > 1;
   glassBackGlow.scale.y = Math.max(h / GLASS.innerH, 0.0001);
   glassBackGlow.position.y = GLASS_FLOOR_Y + h / 2;
@@ -984,7 +999,7 @@ function update(dt) {
     const gfp = gFoamDome.geometry.attributes.position;
     for (let i = 0; i < gfp.count; i++) {
       const gbx = gFoamDomeBase[i * 3], gby = gFoamDomeBase[i * 3 + 1], gbz = gFoamDomeBase[i * 3 + 2];
-      gfp.setXYZ(i, gbx, gby + Math.sin(state.time * 2.4 + gbx * 14 + gbz * 11) * 0.008 + Math.sin(state.time * 1.6 + gbz * 16) * 0.005, gbz);
+      gfp.setXYZ(i, gbx, gby + Math.sin(state.time * 2.4 + gbx * 14 + gbz * 11) * 0.03 + Math.sin(state.time * 1.6 + gbz * 16) * 0.018, gbz);
     }
     gfp.needsUpdate = true;
   }
