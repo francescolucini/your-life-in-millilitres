@@ -188,8 +188,8 @@ const matStream = new THREE.MeshStandardMaterial({ color: 0xe8be52, metalness: 0
 const matFoam = new THREE.MeshStandardMaterial({ color: 0xfaf5e8, roughness: 0.95, metalness: 0 });
 const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xfcf8ee, roughness: 0.92, metalness: 0 });
 // Transparent plastic cup (festival-style) — softer/cheaper than glass
-const scratchTex = makeScratchTexture();
-const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe4e6e8, metalness: 0, roughness: 0.52, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.006, transmission: 0, transparent: true, opacity: 0.36, ior: 1.42, clearcoat: 0, depthWrite: false, envMapIntensity: 0.4 });
+const scratchTex = makePlasticCupTexture();
+const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe8eaec, metalness: 0, roughness: 0.55, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.012, transmission: 0, transparent: true, opacity: 0.44, ior: 1.42, clearcoat: 0, depthWrite: false, envMapIntensity: 0.28 });
 // Beer poured into the cup — opaque amber so it reads clearly (no transmission flicker)
 const matBeerGlass = new THREE.MeshStandardMaterial({ color: 0xdca238, metalness: 0, roughness: 0.25, emissive: 0x7a4200, emissiveIntensity: 0.4 });
 
@@ -345,26 +345,45 @@ function makeBrushedTexture() {
   t.anisotropy = 8;
   return t;
 }
-function makeScratchTexture() {
+// Molded disposable-cup surface: vertical ribs + 2 seam lines + rim rings + scratches
+function makePlasticCupTexture() {
   const cv = document.createElement('canvas'); cv.width = 512; cv.height = 512;
   const x = cv.getContext('2d');
   x.fillStyle = '#808080'; x.fillRect(0, 0, 512, 512);
-  for (let i = 0; i < 350; i++) {
+  // faint vertical molded ribs (vary across U → run vertically around the cup)
+  for (let px = 0; px < 512; px++) {
+    const v = 128 + Math.sin(px / 512 * Math.PI * 2 * 26) * 12;
+    x.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.5)`;
+    x.fillRect(px, 0, 1, 512);
+  }
+  // two brighter mold seam lines on opposite sides
+  for (const sx of [128, 384]) {
+    x.strokeStyle = 'rgba(205,205,205,0.6)'; x.lineWidth = 2.5;
+    x.beginPath(); x.moveTo(sx, 0); x.lineTo(sx + (Math.random() * 3 - 1.5), 512); x.stroke();
+  }
+  // horizontal stacking rings near the rim
+  for (let i = 0; i < 4; i++) {
+    const y = 8 + i * 11;
+    x.strokeStyle = `rgba(190,190,190,${0.3 - i * 0.05})`; x.lineWidth = 1.5;
+    x.beginPath(); x.moveTo(0, y); x.lineTo(512, y); x.stroke();
+  }
+  // fine scuffs and scratches from handling
+  for (let i = 0; i < 380; i++) {
     const sx = Math.random() * 512, sy = Math.random() * 512;
     const ex = sx + (Math.random() - 0.5) * 70, ey = sy + (Math.random() - 0.5) * 70;
     x.strokeStyle = `rgba(185,185,185,${0.08 + Math.random() * 0.22})`;
     x.lineWidth = 0.3 + Math.random() * 0.7;
     x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
   }
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 24; i++) {
     const sx = Math.random() * 512, sy = Math.random() * 512;
     const ex = sx + (Math.random() - 0.5) * 35, ey = sy + (Math.random() - 0.5) * 35;
-    x.strokeStyle = 'rgba(210,210,210,0.35)';
+    x.strokeStyle = 'rgba(215,215,215,0.4)';
     x.lineWidth = 0.6 + Math.random() * 1.4;
     x.beginPath(); x.moveTo(sx, sy); x.lineTo(ex, ey); x.stroke();
   }
   const t = new THREE.CanvasTexture(cv);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(2, 3);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 2);
   t.colorSpace = THREE.NoColorSpace; return t;
 }
 const matDarkPanel = new THREE.MeshStandardMaterial({ color: 0x0b0c0f, metalness: 0.3, roughness: 0.6 });
@@ -402,14 +421,33 @@ frameSlab(sideW, BASE.h,  (NICHE_X + sideW / 2), BASE.h / 2);          // right
 frameSlab(NICHE.w, BASE.h - NICHE_TOP, 0, (NICHE_TOP + BASE.h) / 2);   // top
 frameSlab(NICHE.w, NICHE_BOT, 0, NICHE_BOT / 2);                       // bottom
 
-// Dark recessed back wall of the alcove
-const matNiche = new THREE.MeshStandardMaterial({ color: 0x15181e, metalness: 0.7, roughness: 0.55, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.003, envMapIntensity: 0.3 });
+// Recessed back wall of the alcove — brushed steel, a touch darker than the
+// frame so the depth still reads, but clearly metal (not a black hole)
+const matNiche = new THREE.MeshStandardMaterial({ color: 0x6c7178, metalness: 0.95, roughness: 0.5, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.0035, envMapIntensity: 0.7 });
 const nicheBack = new THREE.Mesh(new THREE.PlaneGeometry(NICHE.w, NICHE.h), matNiche);
 nicheBack.position.set(0, NICHE.y, FRONT_Z - NICHE_DEPTH + 0.004);
 machine.add(nicheBack);
+// Subtle inner side/floor/ceiling walls so the alcove looks fully lined in steel
+const matNicheWall = new THREE.MeshStandardMaterial({ color: 0x7c828a, metalness: 0.95, roughness: 0.45, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.0035, envMapIntensity: 0.8 });
+const nWallL = new THREE.Mesh(new THREE.PlaneGeometry(NICHE_DEPTH, NICHE.h), matNicheWall);
+nWallL.rotation.y = Math.PI / 2;
+nWallL.position.set(-NICHE_X + 0.002, NICHE.y, FRONT_Z - NICHE_DEPTH / 2);
+machine.add(nWallL);
+const nWallR = nWallL.clone();
+nWallR.rotation.y = -Math.PI / 2;
+nWallR.position.x = NICHE_X - 0.002;
+machine.add(nWallR);
+const nWallTop = new THREE.Mesh(new THREE.PlaneGeometry(NICHE.w, NICHE_DEPTH), matNicheWall);
+nWallTop.rotation.x = Math.PI / 2;
+nWallTop.position.set(0, NICHE_TOP - 0.002, FRONT_Z - NICHE_DEPTH / 2);
+machine.add(nWallTop);
+const nWallBot = nWallTop.clone();
+nWallBot.rotation.x = -Math.PI / 2;
+nWallBot.position.y = NICHE_BOT + 0.002;
+machine.add(nWallBot);
 
-// Accent strip near top of base (sits on the frame face)
-const strip = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.05, 0.06, 3, 0.02), matAccent);
+// Trim strip near top of base (sits on the frame face)
+const strip = new THREE.Mesh(new RoundedBoxGeometry(1.6, 0.05, 0.06, 3, 0.02), matMetalTrim);
 strip.position.set(0, BASE.h - 0.02, FRONT_Z - 0.01);
 machine.add(strip);
 
