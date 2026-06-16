@@ -120,7 +120,7 @@ new THREE.TextureLoader().load('./assets/delft.jpeg', (t) => {
 
 // Lights
 scene.add(new THREE.HemisphereLight(0xb8cfe0, 0xb39a7a, 0.55));
-const key = new THREE.DirectionalLight(0xc8daf0, 2.2);
+const key = new THREE.DirectionalLight(0xdbe6f2, 2.5);
 key.position.set(12, 2.8, 0.3);
 key.castShadow = true;
 key.shadow.mapSize.set(2048, 2048);
@@ -129,15 +129,14 @@ key.shadow.camera.left = -5; key.shadow.camera.right = 5;
 key.shadow.camera.top = 6; key.shadow.camera.bottom = -1.5;
 key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
 scene.add(key);
-const rim = new THREE.DirectionalLight(0xe8d8c0, 0.5);
+const rim = new THREE.DirectionalLight(0xdfe6ef, 0.4);
 rim.position.set(-4, 5, -5);
 scene.add(rim);
-const tankGlow = new THREE.PointLight(0xffcf6b, 45, 11, 2);
-tankGlow.position.set(0, 3.4, -0.6);
+// Warm glow strictly to backlight the beer — kept low/local so it no longer
+// spills inconsistent warm highlights across the metal
+const tankGlow = new THREE.PointLight(0xffd591, 9, 3.2, 2);
+tankGlow.position.set(0, 3.3, -0.45);
 scene.add(tankGlow);
-const nicheLight = new THREE.PointLight(0xffe8c8, 0.5, 2.6, 2);
-nicheLight.position.set(0, 1.0, FRONT_Z - 0.04);
-scene.add(nicheLight);
 
 // Ground
 // Light-oak tabletop with bevelled edges
@@ -162,8 +161,8 @@ scene.add(table);
 // MATERIALS
 // =====================================================================
 const brushedTex = makeBrushedTexture();
-const matMetalDark = new THREE.MeshStandardMaterial({ color: 0xc4c8ce, metalness: 0.9, roughness: 0.55, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.004, envMapIntensity: 1.1 });
-const matMetalTrim = new THREE.MeshStandardMaterial({ color: 0x9298a1, metalness: 1.0, roughness: 0.4, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.003, envMapIntensity: 1.2 });
+const matMetalDark = new THREE.MeshStandardMaterial({ color: 0xc7cbd1, metalness: 0.92, roughness: 0.42, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.004, envMapIntensity: 1.35 });
+const matMetalTrim = new THREE.MeshStandardMaterial({ color: 0x969ca5, metalness: 1.0, roughness: 0.3, roughnessMap: brushedTex, bumpMap: brushedTex, bumpScale: 0.003, envMapIntensity: 1.55 });
 const matAccent = new THREE.MeshStandardMaterial({ color: 0xe8a317, metalness: 0.5, roughness: 0.35, emissive: 0x3a2400, emissiveIntensity: 0.4 });
 const matGlass = new THREE.MeshPhysicalMaterial({
   color: 0xffffff, metalness: 0, roughness: 0.06, transmission: 1.0,
@@ -185,11 +184,11 @@ matBeer.onBeforeCompile = (shader) => {
   );
 };
 const matStream = new THREE.MeshStandardMaterial({ color: 0xe8be52, metalness: 0, roughness: 0.35, emissive: 0x8a5a18, emissiveIntensity: 0.25 });
-const matFoam = new THREE.MeshStandardMaterial({ color: 0xfaf5e8, roughness: 0.95, metalness: 0 });
-const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xfcf8ee, roughness: 0.92, metalness: 0 });
+const matFoam = new THREE.MeshStandardMaterial({ color: 0xfaf5e8, roughness: 0.95, metalness: 0, side: THREE.DoubleSide });
+const matFoamTop = new THREE.MeshStandardMaterial({ color: 0xfcf8ee, roughness: 0.92, metalness: 0, side: THREE.DoubleSide });
 // Transparent plastic cup (festival-style) — softer/cheaper than glass
 const scratchTex = makePlasticCupTexture();
-const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xe8eaec, metalness: 0, roughness: 0.55, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.012, transmission: 0, transparent: true, opacity: 0.44, ior: 1.42, clearcoat: 0, depthWrite: false, envMapIntensity: 0.28 });
+const matPlastic = new THREE.MeshPhysicalMaterial({ color: 0xeceef0, metalness: 0, roughness: 0.78, roughnessMap: scratchTex, bumpMap: scratchTex, bumpScale: 0.022, transmission: 0, transparent: true, opacity: 0.52, ior: 1.42, clearcoat: 0, sheen: 0.5, sheenRoughness: 0.9, sheenColor: new THREE.Color(0xffffff), depthWrite: false, envMapIntensity: 0.1 });
 // Beer poured into the cup — opaque amber so it reads clearly (no transmission flicker)
 const matBeerGlass = new THREE.MeshStandardMaterial({ color: 0xdca238, metalness: 0, roughness: 0.25, emissive: 0x7a4200, emissiveIntensity: 0.4 });
 
@@ -513,8 +512,8 @@ const foamRings = foamRingFracs.map(frac => {
 
 // Foam head: skirt (dips into beer, no gap) + single dome (no visible layers)
 const beerFoam = new THREE.Group();
-const foamSkirt = new THREE.Mesh(new THREE.CylinderGeometry(BEER_R + 0.02, BEER_R, 0.09, 40), matFoam);
-foamSkirt.position.y = -0.03; // overlaps the beer surface so no see-through band
+const foamSkirt = new THREE.Mesh(new THREE.CylinderGeometry(BEER_R + 0.02, BEER_R + 0.005, 0.12, 40), matFoam);
+foamSkirt.position.y = -0.045; // plunges into the beer so there's no see-through band
 const foamDome = new THREE.Mesh(
   new THREE.SphereGeometry(BEER_R + 0.02, 40, 24, 0, Math.PI * 2, 0, Math.PI * 0.5),
   matFoamTop
