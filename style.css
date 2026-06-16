@@ -15,6 +15,11 @@ html, body {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
 }
 
 body { display: flex; }
@@ -86,11 +91,12 @@ body { display: flex; }
 
 .disclaimer { margin-top: 16px; font-size: 10.5px; line-height: 1.5; color: #5d5b56; font-style: italic; }
 
-#stage { flex: 1; height: 100vh; position: relative; }
-#stage canvas { display: block; width: 100% !important; height: 100% !important; }
+#stage { flex: 1; height: 100vh; height: 100dvh; position: relative; touch-action: none; }
+#stage canvas { display: block; width: 100% !important; height: 100% !important; touch-action: none; }
 
 @media (max-width: 720px) {
   body { flex-direction: column; }
   #sidebar { width: 100%; min-width: 0; height: auto; max-height: 40vh; border-right: none; border-bottom: 1px solid var(--line); }
-  #stage { height: 60vh; }
+  /* no sidebar in the DOM — keep the stage full-screen instead of leaving 40% blank */
+  #stage { height: 100vh; height: 100dvh; }
 }

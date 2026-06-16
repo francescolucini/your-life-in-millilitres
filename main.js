@@ -67,26 +67,31 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-// Background: the IDE Kafee plaza at TU Delft (gently blurred for depth of field)
-{
-  const img = new Image();
-  img.onload = () => {
-    const bc = document.createElement('canvas'); bc.width = img.width; bc.height = img.height;
-    const bx = bc.getContext('2d');
-    bx.filter = 'blur(56px)';
-    bx.save();
-    bx.translate(img.width / 2, img.height / 2);
-    bx.rotate(-0.055);
-    bx.scale(1.15, 1.08);
-    bx.translate(-img.width / 2, -img.height / 2);
-    bx.drawImage(img, 0, 0);
-    bx.restore();
-    const bgTex = new THREE.CanvasTexture(bc);
-    bgTex.colorSpace = THREE.SRGBColorSpace;
-    scene.background = bgTex;
-  };
-  img.src = './assets/delft.jpeg';
+// Background: the IDE Kafee plaza at TU Delft — blurred, rotated, and
+// cover-cropped to the viewport so it never stretches (esp. portrait mobile)
+const bgImg = new Image();
+let bgReady = false;
+function buildBackground() {
+  if (!bgReady) return;
+  const aspect = Math.max(stage.clientWidth / Math.max(stage.clientHeight, 1), 0.05);
+  const CW = 1280, CH = Math.max(1, Math.round(CW / aspect));
+  const bc = document.createElement('canvas'); bc.width = CW; bc.height = CH;
+  const bx = bc.getContext('2d');
+  bx.filter = 'blur(44px)';
+  // "cover" fit: fill the canvas while preserving aspect, plus extra so the
+  // slight rotation and the blur kernel never expose empty edges
+  const cover = Math.max(CW / bgImg.width, CH / bgImg.height) * 1.2;
+  const dw = bgImg.width * cover, dh = bgImg.height * cover;
+  bx.translate(CW / 2, CH / 2);
+  bx.rotate(-0.055);
+  bx.drawImage(bgImg, -dw / 2, -dh / 2, dw, dh);
+  const tex = new THREE.CanvasTexture(bc);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  if (scene.background && scene.background.isTexture) scene.background.dispose();
+  scene.background = tex;
 }
+bgImg.onload = () => { bgReady = true; buildBackground(); };
+bgImg.src = './assets/delft.jpeg';
 
 const camera = new THREE.PerspectiveCamera(33, stage.clientWidth / stage.clientHeight, 0.1, 100);
 const CAM_BASE = new THREE.Vector3(0.9, 2.0, 9.5);
@@ -554,6 +559,13 @@ const matRubber = new THREE.MeshStandardMaterial({ color: 0x141418, roughness: 0
 const leverKnob = new THREE.Mesh(new THREE.CapsuleGeometry(0.034, 0.22, 6, 16), matRubber);
 leverKnob.position.set(0, 0.32, 0);
 leverPivot.add(leverKnob);
+// invisible, enlarged hit target so the tap is easy to grab (esp. on touch)
+const leverHit = new THREE.Mesh(
+  new THREE.BoxGeometry(0.22, 0.5, 0.22),
+  new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+);
+leverHit.position.set(0, 0.26, 0);
+leverPivot.add(leverHit);
 
 // --- Drinking glass ---
 const glassMesh = new THREE.Mesh(new THREE.CylinderGeometry(GLASS.rTop, GLASS.rBot, GLASS.h, 48, 1, true), matPlastic);
@@ -1036,7 +1048,7 @@ function hitScreen() {
 }
 function hitLever() {
   raycaster.setFromCamera(ndc, camera);
-  return raycaster.intersectObjects([lever, leverKnob], false).length > 0;
+  return raycaster.intersectObjects([lever, leverKnob, leverHit], false).length > 0;
 }
 function inCircle(p, b) { return Math.hypot(p.x - b.cx, p.y - b.cy) <= b.r + 8; }
 function inRect(p, b) { return p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h; }
@@ -1053,6 +1065,8 @@ function setAgeFrom(p) {
 }
 
 function onDown(ev) {
+  ev.preventDefault();
+  try { el.setPointerCapture(ev.pointerId); } catch (e) {}
   setNDC(ev);
   if (state.phase === 'idle') { state.phase = 'input'; return; }
   if (state.phase === 'input') {
@@ -1073,6 +1087,7 @@ function onDown(ev) {
   }
 }
 function onMove(ev) {
+  if (state.dragging || state.isHolding) ev.preventDefault();
   setNDC(ev);
   if (state.dragging) {
     const p = hitScreen();
@@ -1085,9 +1100,13 @@ function onUp() {
 }
 
 const el = renderer.domElement;
-el.addEventListener('pointerdown', onDown);
-el.addEventListener('pointermove', onMove);
+el.style.touchAction = 'none';
+el.addEventListener('pointerdown', onDown, { passive: false });
+el.addEventListener('pointermove', onMove, { passive: false });
 window.addEventListener('pointerup', onUp);
+window.addEventListener('pointercancel', onUp);
+// block the long-press selection / callout that hijacks touch on mobile
+el.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // =====================================================================
 // RESIZE
@@ -1099,8 +1118,10 @@ function onResize() {
   camera.updateProjectionMatrix();
   frameMachine();
   camera.position.copy(CAM_BASE);
+  buildBackground();
 }
 window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
 
 // shadows: cabinet & metal cast onto the table (glass/beer skipped to avoid fake solid shadows)
 machine.traverse((o) => {
