@@ -764,6 +764,11 @@ function drawPaperTexture() {
   paperTex.needsUpdate = true;
 }
 
+// Camera focus for the printing moment — look at the paper as it feeds out
+const CAM_FOCUS = new THREE.Vector3(PR_X, 1.02, PR_Z);
+const camLookCur = CAM_TARGET.clone();
+const _camPos = new THREE.Vector3(), _camTgt = new THREE.Vector3();
+
 // =====================================================================
 // MICRO DETAILS
 // =====================================================================
@@ -1145,9 +1150,18 @@ function update(dt) {
     }
     gfp.needsUpdate = true;
   }
-  // subtle camera parallax
-  camera.position.lerp(CAM_BASE, 0.06);
-  camera.lookAt(CAM_TARGET);
+  // camera: pull in toward the printer while it prints / the receipt is shown
+  const focusing = printing || state.phase === 'done';
+  if (focusing) {
+    _camPos.set(PR_X + 1.45, 1.55, CAM_BASE.z * 0.62 + 0.4);
+    _camTgt.copy(CAM_FOCUS);
+  } else {
+    _camPos.copy(CAM_BASE);
+    _camTgt.copy(CAM_TARGET);
+  }
+  camera.position.lerp(_camPos, focusing ? 0.045 : 0.06);
+  camLookCur.lerp(_camTgt, 0.05);
+  camera.lookAt(camLookCur);
   drawScreen();
 }
 
