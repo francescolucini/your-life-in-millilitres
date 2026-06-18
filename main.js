@@ -67,30 +67,38 @@ renderer.localClippingEnabled = true; // for the receipt emerging from the print
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-// Background: the IDE Kafee plaza at TU Delft — blurred, rotated, and
-// cover-cropped to the viewport so it never stretches (esp. portrait mobile)
+scene.background = new THREE.Color(0x6f6456); // warm plaza-grey, shows only at the edges
+// Background: the IDE Kafee plaza at TU Delft — a large blurred plane placed
+// BEHIND the machine in world space, so it shares the scene's perspective and
+// parallaxes together with the table/machine as the camera moves (a screen-
+// fixed scene.background would stay glued to the viewport instead).
 const bgImg = new Image();
-let bgReady = false;
+const backdrop = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshBasicMaterial()
+);
+backdrop.position.set(0, 3.2, -4.0);
+backdrop.rotation.z = 0.03; // faint counter-clockwise tilt
+backdrop.renderOrder = -1;
+scene.add(backdrop);
 function buildBackground() {
-  if (!bgReady) return;
-  const aspect = Math.max(stage.clientWidth / Math.max(stage.clientHeight, 1), 0.05);
-  const CW = 1280, CH = Math.max(1, Math.round(CW / aspect));
+  if (!bgImg.naturalWidth) return;
+  const iw = bgImg.width, ih = bgImg.height;
+  const CW = 1280, CH = Math.round(CW * ih / iw);
   const bc = document.createElement('canvas'); bc.width = CW; bc.height = CH;
   const bx = bc.getContext('2d');
-  bx.filter = 'blur(44px)';
-  // "cover" fit: fill the canvas while preserving aspect, plus extra so the
-  // slight rotation and the blur kernel never expose empty edges
-  const cover = Math.max(CW / bgImg.width, CH / bgImg.height) * 1.2;
-  const dw = bgImg.width * cover, dh = bgImg.height * cover;
-  bx.translate(CW / 2, CH / 2);
-  bx.rotate(-0.055);
-  bx.drawImage(bgImg, -dw / 2, -dh / 2, dw, dh);
+  bx.filter = 'blur(40px)';
+  const zf = 1.12, dw = CW * zf, dh = CH * zf; // slight zoom so blur never bares the edge
+  bx.drawImage(bgImg, (CW - dw) / 2, (CH - dh) / 2, dw, dh);
   const tex = new THREE.CanvasTexture(bc);
   tex.colorSpace = THREE.SRGBColorSpace;
-  if (scene.background && scene.background.isTexture) scene.background.dispose();
-  scene.background = tex;
+  if (backdrop.material.map) backdrop.material.map.dispose();
+  backdrop.material.map = tex;
+  backdrop.material.needsUpdate = true;
+  const H = 22, W = H * iw / ih; // generous so it covers every camera pose
+  backdrop.scale.set(W, H, 1);
 }
-bgImg.onload = () => { bgReady = true; buildBackground(); };
+bgImg.onload = buildBackground;
 bgImg.src = './assets/delft.jpeg';
 
 const camera = new THREE.PerspectiveCamera(33, stage.clientWidth / stage.clientHeight, 0.1, 100);
@@ -141,8 +149,9 @@ scene.add(tankGlow);
 // Ground
 // Light-oak tabletop with bevelled edges
 const tableTex = makeTableTextures();
+const TABLE_THICK = 0.34;
 const table = new THREE.Mesh(
-  new RoundedBoxGeometry(7.5, 0.14, 3.2, 6, 0.06),
+  new RoundedBoxGeometry(7.5, TABLE_THICK, 3.2, 6, 0.05),
   new THREE.MeshStandardMaterial({
     map: tableTex.color,
     roughnessMap: tableTex.rough,
@@ -153,7 +162,7 @@ const table = new THREE.Mesh(
     envMapIntensity: 0.5,
   })
 );
-table.position.set(0, -0.072, 0.45);
+table.position.set(0, -TABLE_THICK / 2, 0.45); // top stays at y≈0 where the machine rests
 table.receiveShadow = true;
 scene.add(table);
 
@@ -1256,7 +1265,6 @@ function onResize() {
   camera.updateProjectionMatrix();
   frameMachine();
   camera.position.copy(CAM_BASE);
-  buildBackground();
 }
 window.addEventListener('resize', onResize);
 window.addEventListener('orientationchange', onResize);
