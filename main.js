@@ -63,6 +63,7 @@ renderer.toneMappingExposure = 1.05;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.localClippingEnabled = true; // for the receipt emerging from the printer slot
 stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -679,6 +680,90 @@ pourFoam.visible = false;
 machine.add(pourStream);
 machine.add(pourFoam);
 
+// --- Receipt printer (mounted on the right of the front panel) ---
+const PR_X = NICHE_X + sideW / 2;        // centred on the right frame slab
+const PR_SLOT_Y = 1.2;                    // below the screen bezel, clear of the niche
+const PR_MOUTH_Y = PR_SLOT_Y - 0.012;
+const PR_Z = FRONT_Z + 0.075;
+const PAPER_W = 0.26, PAPER_H = 0.572;
+const printerBody = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.13, 0.06, 4, 0.02), matMetalTrim);
+printerBody.position.set(PR_X, PR_SLOT_Y, FRONT_Z + 0.03);
+machine.add(printerBody);
+const printerSlot = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.022, 0.04), matDarkPanel);
+printerSlot.position.set(PR_X, PR_MOUTH_Y, FRONT_Z + 0.062);
+machine.add(printerSlot);
+
+// receipt paper — a textured plane fed out of the slot, clipped at the mouth
+const paperCanvas = document.createElement('canvas');
+paperCanvas.width = 300; paperCanvas.height = 660;
+const pctx = paperCanvas.getContext('2d');
+const paperTex = new THREE.CanvasTexture(paperCanvas);
+paperTex.colorSpace = THREE.SRGBColorSpace; paperTex.anisotropy = 8;
+const printerClip = new THREE.Plane(new THREE.Vector3(0, -1, 0), PR_MOUTH_Y); // keep y <= mouth
+const paperGeo = new THREE.PlaneGeometry(PAPER_W, PAPER_H);
+paperGeo.translate(0, -PAPER_H / 2, 0); // pivot at top edge
+const paper = new THREE.Mesh(paperGeo, new THREE.MeshBasicMaterial({
+  map: paperTex, toneMapped: false, side: THREE.DoubleSide, clippingPlanes: [printerClip],
+}));
+const PAPER_HIDDEN_Y = PR_MOUTH_Y + PAPER_H + 0.02;
+paper.position.set(PR_X, PAPER_HIDDEN_Y, PR_Z);
+paper.rotation.y = -0.04; // faint curl toward the viewer
+paper.visible = false;
+machine.add(paper);
+
+// QR (same destination as the on-screen popup): Healthline's phubbing guide
+const qrImg = new Image();
+qrImg.onload = () => { if (paper.visible) drawPaperTexture(); };
+qrImg.src = './assets/qr.png';
+
+function wrapLines(ctx, text, maxW) {
+  const words = text.split(' '); const lines = []; let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+function receiptMessage() {
+  const screenH = state.screenHours;
+  const leftH = Math.round(Math.max(0, state.resultRemaining / ML_PER_HOUR) * 10) / 10;
+  const fmt = (h) => (Number.isInteger(h) ? String(h) : h.toFixed(1));
+  const intro = `Your daily screen time is ${fmt(screenH)} ${screenH === 1 ? 'hour' : 'hours'}.`;
+  const body = leftH < 0.05
+    ? 'This means, on average, you have almost no time left to spend with loved ones.'
+    : `This means, on average, you have only ${fmt(leftH)} ${leftH === 1 ? 'hour' : 'hours'} left to spend with loved ones.`;
+  return { intro, body };
+}
+function drawPaperTexture() {
+  const W = 300, H = 660, x = pctx, m = 26;
+  x.fillStyle = '#f7f5ef'; x.fillRect(0, 0, W, H);
+  x.fillStyle = '#1c1a17';
+  x.textAlign = 'center'; x.textBaseline = 'alphabetic';
+  x.font = '700 16px "Helvetica Neue", Arial, sans-serif';
+  x.fillText('YOUR LIFE IN MILLILITRES', W / 2, 46);
+  x.fillRect(m, 60, W - 2 * m, 2);
+  const { intro, body } = receiptMessage();
+  x.textAlign = 'left';
+  let y = 100;
+  x.font = '700 21px "Helvetica Neue", Arial, sans-serif';
+  for (const ln of wrapLines(x, intro, W - 2 * m)) { x.fillText(ln, m, y); y += 28; }
+  y += 6;
+  x.font = '400 20px "Helvetica Neue", Arial, sans-serif';
+  for (const ln of wrapLines(x, body, W - 2 * m)) { x.fillText(ln, m, y); y += 27; }
+  x.textAlign = 'center';
+  y += 34;
+  x.font = '600 17px "Helvetica Neue", Arial, sans-serif';
+  x.fillText('Find out more on', W / 2, y);
+  y += 18;
+  const qs = 150;
+  if (qrImg.complete && qrImg.naturalWidth) x.drawImage(qrImg, (W - qs) / 2, y, qs, qs);
+  y += qs + 32;
+  x.font = '600 17px "Helvetica Neue", Arial, sans-serif';
+  x.fillText('how you can make the change.', W / 2, y);
+  paperTex.needsUpdate = true;
+}
+
 // =====================================================================
 // MICRO DETAILS
 // =====================================================================
@@ -996,7 +1081,10 @@ function resetMachine() {
   state.step = null;
   state.queue = [];
   state.isHolding = false;
-  receiptShown = false;
+  receiptStarted = false;
+  printing = false;
+  paper.visible = false;
+  paper.position.y = PAPER_HIDDEN_Y;
   hideReceipt();
 }
 
@@ -1027,8 +1115,10 @@ function update(dt) {
       }
     }
   }
-  // print the receipt once, the moment the pour finishes
-  if (state.phase === 'done' && !receiptShown) { receiptShown = true; showReceipt(); }
+  // when the pour finishes: feed the receipt out of the 3D printer; the popup
+  // appears only once the paper has fully printed (handled in updatePrinting)
+  if (state.phase === 'done' && !receiptStarted) { receiptStarted = true; startPrinting(); }
+  updatePrinting(dt);
   // lever tilt
   const targetTilt = (state.phase === 'pouring' && state.isHolding) ? 0.55 : 0;
   leverPivot.rotation.x = THREE.MathUtils.lerp(leverPivot.rotation.x, targetTilt, 0.18);
@@ -1163,23 +1253,19 @@ machine.traverse((o) => {
 });
 
 // =====================================================================
-// RECEIPT — the printed takeaway at the end of the experience
+// RECEIPT — the printed takeaway (popup mirrors the paper from the 3D printer)
 // =====================================================================
-let receiptShown = false;
 const receiptOverlay = document.createElement('div');
 receiptOverlay.id = 'receipt-overlay';
 receiptOverlay.hidden = true;
 receiptOverlay.innerHTML = `
   <div id="receipt-paper" role="dialog" aria-label="Your receipt">
-    <div class="r-logo">YOUR LIFE</div>
-    <div class="r-logo r-amber">IN MILLILITRES</div>
-    <div class="r-sub">ID Kafee · TU Delft</div>
-    <div class="r-sub r-small">IDEM1213-25 · Behavioural Design</div>
+    <div class="r-logo">YOUR LIFE IN MILLILITRES</div>
     <div class="r-rule"></div>
-    <div id="r-rows"></div>
-    <div id="r-foot"></div>
-    <div class="r-barcode"></div>
-    <div class="r-sub r-small" id="r-stamp"></div>
+    <p id="r-msg"></p>
+    <p class="r-find">Find out more on</p>
+    <img id="r-qr" alt="QR code — how to stop phubbing" src="./assets/qr.png" />
+    <p class="r-find">how you can make the change.</p>
   </div>
   <div id="receipt-actions">
     <button id="r-print" type="button">Print receipt</button>
@@ -1187,29 +1273,11 @@ receiptOverlay.innerHTML = `
   </div>`;
 document.body.appendChild(receiptOverlay);
 
-const rRowsEl = receiptOverlay.querySelector('#r-rows');
-const rFootEl = receiptOverlay.querySelector('#r-foot');
-const rStampEl = receiptOverlay.querySelector('#r-stamp');
-const rRow = (label, value, cls = '') => `<div class="r-row ${cls}"><span>${label}</span><span>${value}</span></div>`;
+const rMsgEl = receiptOverlay.querySelector('#r-msg');
 
 function buildReceipt() {
-  const screenMl = Math.round(state.screenHours * ML_PER_HOUR);
-  const remaining = Math.max(0, Math.round(state.resultRemaining));
-  let html = rRow('One day', '330 ml', 'r-strong') + '<div class="r-dash"></div>';
-  for (const o of OBLIGATIONS) html += rRow(o.label, `−${o.ml} ml`);
-  html += '<div class="r-dash"></div>';
-  html += rRow('Free time', `${FREE_ML} ml`);
-  html += rRow(`Screen time · ${state.screenHours.toFixed(1)} h`, `−${screenMl} ml`);
-  html += '<div class="r-dash r-double"></div>';
-  html += rRow('YOU GET', `${remaining} ml`, 'r-total');
-  rRowsEl.innerHTML = html;
-
-  rFootEl.innerHTML = remaining <= 0
-    ? `<p><strong>Your phone drank all of it.</strong></p><p>No free time left to pour today.</p>`
-    : `<p>That's the beer in your glass —</p><p>and the free time you have left</p><p>for friends &amp; family.</p><p class="r-wise">Drink it wisely.</p>`;
-
-  const d = new Date(), pad = (n) => String(n).padStart(2, '0');
-  rStampEl.textContent = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}   ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const { intro, body } = receiptMessage();
+  rMsgEl.innerHTML = `<strong>${intro}</strong> ${body}`;
 }
 function showReceipt() {
   buildReceipt();
@@ -1222,6 +1290,24 @@ function hideReceipt() {
 }
 receiptOverlay.querySelector('#r-print').addEventListener('click', () => window.print());
 receiptOverlay.querySelector('#r-again').addEventListener('click', () => resetMachine());
+
+// --- Printing sequence: paper feeds out of the 3D slot, THEN the popup appears ---
+let receiptStarted = false, printing = false, printT = 0;
+const PRINT_DUR = 2.6;
+function startPrinting() {
+  drawPaperTexture();
+  paper.visible = true;
+  paper.position.y = PAPER_HIDDEN_Y;
+  printing = true; printT = 0;
+}
+function updatePrinting(dt) {
+  if (!printing) return;
+  printT += dt;
+  const k = THREE.MathUtils.clamp(printT / PRINT_DUR, 0, 1);
+  const e = 1 - Math.pow(1 - k, 3); // easeOut — fast start, gentle stop
+  paper.position.y = PAPER_HIDDEN_Y - (PAPER_H + 0.02) * e;
+  if (k >= 1) { printing = false; showReceipt(); }
+}
 
 // init
 setTankLevel(state.tankMl);
