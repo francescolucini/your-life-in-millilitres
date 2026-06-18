@@ -38,7 +38,6 @@ const SPOUT_TIP_Y = 0.9;
 // =====================================================================
 const state = {
   phase: 'idle',          // idle | input | draining | pour_ready | pouring | done
-  age: 22,
   screenHours: 5.0,
   tankMl: TOTAL_ML,
   glassMl: 0,
@@ -824,9 +823,8 @@ function updatePourStream() {
 // =====================================================================
 const C = { w: 1024, h: 768 };
 const UI = {
-  ageSlider: { x: 200, y: 300, w: 624 },
-  slider:    { x: 200, y: 520, w: 624 },
-  start:     { x: 312, y: 624, w: 400, h: 96 },
+  slider:    { x: 200, y: 430, w: 624 },
+  start:     { x: 312, y: 600, w: 400, h: 96 },
   restart:   { x: 312, y: 640, w: 400, h: 80 },
 };
 
@@ -866,10 +864,8 @@ function drawScreen() {
     center('TOUCH TO START', 600, 40, '#e8e6e0');
     sctx.globalAlpha = 1;
   } else if (state.phase === 'input') {
-    center('SET YOURSELF UP', 96, 34, '#8a8780', '600');
-    center('YOUR AGE', 196, 28, '#8a8780', '600');
-    drawSlider(UI.ageSlider, (state.age - 16) / 64, String(state.age));
-    center('DAILY SCREEN TIME', 416, 28, '#8a8780', '600');
+    center('HOW MUCH SCREEN TIME?', 170, 42, '#e8e6e0', '700');
+    center('on an average day', 235, 28, '#8a8780', '400');
     const ml = Math.round(state.screenHours * ML_PER_HOUR);
     drawSlider(UI.slider, state.screenHours / 12, `${state.screenHours.toFixed(1)} h  ·  ${ml} ml`);
     drawRectBtn(UI.start, 'START');
@@ -919,8 +915,11 @@ function drawScreen() {
       center('of free time left to spend', 330, 36, '#e8e6e0', '600');
       center('with your friends and family.', 380, 36, '#e8e6e0', '600');
     }
-    center('Drink it wisely.', 500, 40, '#8a8780', '400');
-    drawRectBtn(UI.restart, 'RESTART');
+    center('Drink it wisely.', 480, 40, '#8a8780', '400');
+    const pulse2 = 0.5 + 0.5 * Math.sin(t * 3);
+    sctx.globalAlpha = pulse2;
+    center('TAKE YOUR RECEIPT', 600, 34, '#e8a317', '700');
+    sctx.globalAlpha = 1;
   }
   screenTex.needsUpdate = true;
 }
@@ -997,6 +996,8 @@ function resetMachine() {
   state.step = null;
   state.queue = [];
   state.isHolding = false;
+  receiptShown = false;
+  hideReceipt();
 }
 
 // =====================================================================
@@ -1026,6 +1027,8 @@ function update(dt) {
       }
     }
   }
+  // print the receipt once, the moment the pour finishes
+  if (state.phase === 'done' && !receiptShown) { receiptShown = true; showReceipt(); }
   // lever tilt
   const targetTilt = (state.phase === 'pouring' && state.isHolding) ? 0.55 : 0;
   leverPivot.rotation.x = THREE.MathUtils.lerp(leverPivot.rotation.x, targetTilt, 0.18);
@@ -1095,11 +1098,6 @@ function setSliderFrom(p) {
   const f = THREE.MathUtils.clamp((p.x - b.x) / b.w, 0, 1);
   state.screenHours = Math.round(f * 12 / 0.5) * 0.5;
 }
-function setAgeFrom(p) {
-  const b = UI.ageSlider;
-  const f = THREE.MathUtils.clamp((p.x - b.x) / b.w, 0, 1);
-  state.age = Math.round(16 + f * 64);
-}
 
 function onDown(ev) {
   ev.preventDefault();
@@ -1110,7 +1108,6 @@ function onDown(ev) {
     const p = hitScreen();
     if (!p) return;
     if (inRect(p, UI.start)) { startDraining(); return; }
-    if (onSliderB(p, UI.ageSlider)) { state.dragging = 'age'; setAgeFrom(p); return; }
     if (onSliderB(p, UI.slider)) { state.dragging = 'screen'; setSliderFrom(p); return; }
     return;
   }
@@ -1128,7 +1125,7 @@ function onMove(ev) {
   setNDC(ev);
   if (state.dragging) {
     const p = hitScreen();
-    if (p) { if (state.dragging === 'age') setAgeFrom(p); else setSliderFrom(p); }
+    if (p) setSliderFrom(p);
   }
 }
 function onUp() {
@@ -1164,6 +1161,67 @@ window.addEventListener('orientationchange', onResize);
 machine.traverse((o) => {
   if (o.isMesh && o.material && o.material.isMeshStandardMaterial && !o.material.transparent) o.castShadow = true;
 });
+
+// =====================================================================
+// RECEIPT — the printed takeaway at the end of the experience
+// =====================================================================
+let receiptShown = false;
+const receiptOverlay = document.createElement('div');
+receiptOverlay.id = 'receipt-overlay';
+receiptOverlay.hidden = true;
+receiptOverlay.innerHTML = `
+  <div id="receipt-paper" role="dialog" aria-label="Your receipt">
+    <div class="r-logo">YOUR LIFE</div>
+    <div class="r-logo r-amber">IN MILLILITRES</div>
+    <div class="r-sub">ID Kafee · TU Delft</div>
+    <div class="r-sub r-small">IDEM1213-25 · Behavioural Design</div>
+    <div class="r-rule"></div>
+    <div id="r-rows"></div>
+    <div id="r-foot"></div>
+    <div class="r-barcode"></div>
+    <div class="r-sub r-small" id="r-stamp"></div>
+  </div>
+  <div id="receipt-actions">
+    <button id="r-print" type="button">Print receipt</button>
+    <button id="r-again" type="button">Pour another</button>
+  </div>`;
+document.body.appendChild(receiptOverlay);
+
+const rRowsEl = receiptOverlay.querySelector('#r-rows');
+const rFootEl = receiptOverlay.querySelector('#r-foot');
+const rStampEl = receiptOverlay.querySelector('#r-stamp');
+const rRow = (label, value, cls = '') => `<div class="r-row ${cls}"><span>${label}</span><span>${value}</span></div>`;
+
+function buildReceipt() {
+  const screenMl = Math.round(state.screenHours * ML_PER_HOUR);
+  const remaining = Math.max(0, Math.round(state.resultRemaining));
+  let html = rRow('One day', '330 ml', 'r-strong') + '<div class="r-dash"></div>';
+  for (const o of OBLIGATIONS) html += rRow(o.label, `−${o.ml} ml`);
+  html += '<div class="r-dash"></div>';
+  html += rRow('Free time', `${FREE_ML} ml`);
+  html += rRow(`Screen time · ${state.screenHours.toFixed(1)} h`, `−${screenMl} ml`);
+  html += '<div class="r-dash r-double"></div>';
+  html += rRow('YOU GET', `${remaining} ml`, 'r-total');
+  rRowsEl.innerHTML = html;
+
+  rFootEl.innerHTML = remaining <= 0
+    ? `<p><strong>Your phone drank all of it.</strong></p><p>No free time left to pour today.</p>`
+    : `<p>That's the beer in your glass —</p><p>and the free time you have left</p><p>for friends &amp; family.</p><p class="r-wise">Drink it wisely.</p>`;
+
+  const d = new Date(), pad = (n) => String(n).padStart(2, '0');
+  rStampEl.textContent = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}   ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function showReceipt() {
+  buildReceipt();
+  receiptOverlay.hidden = false;
+  requestAnimationFrame(() => receiptOverlay.classList.add('show'));
+}
+function hideReceipt() {
+  receiptOverlay.classList.remove('show');
+  receiptOverlay.hidden = true;
+}
+receiptOverlay.querySelector('#r-print').addEventListener('click', () => window.print());
+receiptOverlay.querySelector('#r-again').addEventListener('click', () => resetMachine());
 
 // init
 setTankLevel(state.tankMl);

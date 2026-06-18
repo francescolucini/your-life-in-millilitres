@@ -100,3 +100,81 @@ body { display: flex; }
   /* no sidebar in the DOM — keep the stage full-screen instead of leaving 40% blank */
   #stage { height: 100vh; height: 100dvh; }
 }
+
+/* =====================================================================
+   RECEIPT — printed takeaway at the end
+   ===================================================================== */
+#receipt-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 22px; padding: 24px;
+  background: rgba(4, 4, 6, 0.72);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+#receipt-overlay[hidden] { display: none !important; }
+
+#receipt-paper {
+  width: 320px; max-width: 100%;
+  background: #f7f5ef; color: #1c1a17;
+  font-family: "Courier New", ui-monospace, monospace;
+  padding: 30px 26px 22px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  /* torn top & bottom edges */
+  --tear: 7px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) center/100% calc(100% - 2 * var(--tear)) no-repeat,
+    radial-gradient(var(--tear) at 50% 0, #0000 98%, #000) top left / calc(2 * var(--tear)) var(--tear) repeat-x,
+    radial-gradient(var(--tear) at 50% 100%, #0000 98%, #000) bottom left / calc(2 * var(--tear)) var(--tear) repeat-x;
+  mask:
+    linear-gradient(#000 0 0) center/100% calc(100% - 2 * var(--tear)) no-repeat,
+    radial-gradient(var(--tear) at 50% 0, #0000 98%, #000) top left / calc(2 * var(--tear)) var(--tear) repeat-x,
+    radial-gradient(var(--tear) at 50% 100%, #0000 98%, #000) bottom left / calc(2 * var(--tear)) var(--tear) repeat-x;
+  transform: translateY(-16px); opacity: 0;
+  transition: transform 0.55s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+}
+#receipt-overlay.show #receipt-paper { transform: translateY(0); opacity: 1; }
+
+.r-logo { font-weight: 700; font-size: 21px; letter-spacing: 0.04em; line-height: 1.12; }
+.r-logo.r-amber { color: #c87f10; }
+.r-sub { font-size: 11px; color: #6b665d; margin-top: 4px; letter-spacing: 0.02em; }
+.r-sub.r-small { font-size: 9.5px; margin-top: 2px; }
+.r-rule { border-top: 2px solid #1c1a17; margin: 14px 0 10px; }
+
+.r-row { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; line-height: 1.95; text-align: left; }
+.r-row span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.r-row.r-strong { font-weight: 700; }
+.r-row.r-total { font-weight: 700; font-size: 19px; padding: 4px 0; }
+.r-dash { border-top: 1px dashed #8a857a; margin: 8px 0; }
+.r-dash.r-double { border-top: 3px double #1c1a17; margin: 9px 0; }
+
+#r-foot { margin-top: 14px; font-size: 11.5px; line-height: 1.65; color: #2c2a26; }
+#r-foot p { margin: 0; }
+#r-foot .r-wise { margin-top: 10px; font-weight: 700; font-size: 13px; }
+
+.r-barcode {
+  height: 42px; margin: 18px 6px 8px;
+  background: repeating-linear-gradient(90deg,
+    #1c1a17 0 2px, #f7f5ef 2px 4px, #1c1a17 4px 7px, #f7f5ef 7px 9px,
+    #1c1a17 9px 10px, #f7f5ef 10px 13px, #1c1a17 13px 16px, #f7f5ef 16px 18px);
+}
+
+#receipt-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+#receipt-actions button {
+  font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: 0.02em;
+  padding: 13px 26px; border-radius: 10px; cursor: pointer; border: 1px solid var(--line);
+  -webkit-tap-highlight-color: transparent;
+}
+#r-print { background: var(--amber); color: #161616; border-color: var(--amber); }
+#r-again { background: transparent; color: var(--ink); }
+#r-print:hover { filter: brightness(1.08); }
+#r-again:hover { border-color: var(--amber); color: var(--amber); }
+
+@media print {
+  body * { visibility: hidden; }
+  #receipt-overlay, #receipt-overlay * { visibility: visible; }
+  #receipt-overlay { position: absolute; inset: 0; padding: 0; background: #fff; backdrop-filter: none; display: block; }
+  #receipt-paper { box-shadow: none; margin: 0 auto; transform: none; opacity: 1; -webkit-mask: none; mask: none; }
+  #receipt-actions { display: none !important; }
+}
