@@ -719,10 +719,20 @@ paper.rotation.y = -0.04; // faint curl toward the viewer
 paper.visible = false;
 machine.add(paper);
 
-// QR (same destination as the on-screen popup): Healthline's phubbing guide
-const qrImg = new Image();
-qrImg.onload = () => { if (paper.visible) drawPaperTexture(); };
-qrImg.src = './assets/qr.png';
+// Sticker images: green / yellow / red based on ml remaining
+const stickerImgs = {
+  green:  Object.assign(new Image(), { src: './assets/sticker-green.png'  }),
+  yellow: Object.assign(new Image(), { src: './assets/sticker-yellow.png' }),
+  red:    Object.assign(new Image(), { src: './assets/sticker-red.png'    }),
+};
+Object.values(stickerImgs).forEach(img => { img.onload = () => { if (paper.visible) drawPaperTexture(); }; });
+
+function pickSticker() {
+  const ml = state.resultRemaining;
+  if (ml > 100) return stickerImgs.green;
+  if (ml >= 30)  return stickerImgs.yellow;
+  return stickerImgs.red;
+}
 
 function wrapLines(ctx, text, maxW) {
   const words = text.split(' '); const lines = []; let line = '';
@@ -735,12 +745,14 @@ function wrapLines(ctx, text, maxW) {
 }
 function receiptMessage() {
   const screenH = state.screenHours;
+  const screenMl = Math.round(screenH * ML_PER_HOUR);
+  const leftMl = Math.round(Math.max(0, state.resultRemaining));
   const leftH = Math.round(Math.max(0, state.resultRemaining / ML_PER_HOUR) * 10) / 10;
   const fmt = (h) => (Number.isInteger(h) ? String(h) : h.toFixed(1));
-  const intro = `Your daily screen time is ${fmt(screenH)} ${screenH === 1 ? 'hour' : 'hours'}.`;
+  const intro = `Your daily screen time is ${fmt(screenH)} h · ${screenMl} ml.`;
   const body = leftH < 0.05
     ? 'This means, on average, you have almost no time left to spend with loved ones.'
-    : `This means, on average, you have only ${fmt(leftH)} ${leftH === 1 ? 'hour' : 'hours'} left to spend with loved ones.`;
+    : `This means, on average, you have only ${fmt(leftH)} h · ${leftMl} ml left to spend with loved ones.`;
   return { intro, body };
 }
 function drawPaperTexture() {
@@ -761,14 +773,9 @@ function drawPaperTexture() {
   for (const ln of wrapLines(x, body, W - 2 * m)) { x.fillText(ln, m, y); y += 27; }
   x.textAlign = 'center';
   y += 34;
-  x.font = '600 17px "Helvetica Neue", Arial, sans-serif';
-  x.fillText('Find out more on', W / 2, y);
-  y += 18;
-  const qs = 150;
-  if (qrImg.complete && qrImg.naturalWidth) x.drawImage(qrImg, (W - qs) / 2, y, qs, qs);
-  y += qs + 32;
-  x.font = '600 17px "Helvetica Neue", Arial, sans-serif';
-  x.fillText('how you can make the change.', W / 2, y);
+  const sticker = pickSticker();
+  const ss = 160;
+  if (sticker.complete && sticker.naturalWidth) x.drawImage(sticker, (W - ss) / 2, y, ss, ss);
   paperTex.needsUpdate = true;
 }
 
@@ -1284,9 +1291,7 @@ receiptOverlay.innerHTML = `
     <div class="r-logo">YOUR LIFE IN MILLILITRES</div>
     <div class="r-rule"></div>
     <p id="r-msg"></p>
-    <p class="r-find">Find out more on</p>
-    <img id="r-qr" alt="QR code — how to stop phubbing" src="./assets/qr.png" />
-    <p class="r-find">how you can make the change.</p>
+    <img id="r-sticker" alt="sticker" />
   </div>
   <div id="receipt-actions">
     <button id="r-print" type="button">Print receipt</button>
@@ -1299,6 +1304,8 @@ const rMsgEl = receiptOverlay.querySelector('#r-msg');
 function buildReceipt() {
   const { intro, body } = receiptMessage();
   rMsgEl.innerHTML = `<strong>${intro}</strong> ${body}`;
+  const stickerEl = receiptOverlay.querySelector('#r-sticker');
+  stickerEl.src = pickSticker().src;
 }
 function showReceipt() {
   buildReceipt();
