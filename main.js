@@ -965,7 +965,7 @@ function drawScreen() {
     center('HOW MUCH SCREEN TIME?', 170, 42, '#e8e6e0', '700');
     center('on an average day', 235, 28, '#8a8780', '400');
     const ml = Math.round(state.screenHours * ML_PER_HOUR);
-    drawSlider(UI.slider, state.screenHours / 12, `${state.screenHours.toFixed(1)} h  ·  ${ml} ml`);
+    drawSlider(UI.slider, state.screenHours / 14, `${state.screenHours.toFixed(1)} h  ·  ${ml} ml`);
     drawRectBtn(UI.start, 'START');
   } else if (state.phase === 'draining') {
     center('YOUR LIFE', 80, 26, '#8a8780', '600');
@@ -1208,7 +1208,7 @@ function onSliderB(p, b) { return p.x >= b.x - 30 && p.x <= b.x + b.w + 30 && Ma
 function setSliderFrom(p) {
   const b = UI.slider;
   const f = THREE.MathUtils.clamp((p.x - b.x) / b.w, 0, 1);
-  state.screenHours = Math.round(f * 12 / 0.5) * 0.5;
+  state.screenHours = Math.round(f * 14 / 0.5) * 0.5;
 }
 
 function onDown(ev) {
