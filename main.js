@@ -10,12 +10,11 @@ const ML_PER_HOUR = TOTAL_ML_per_hour();
 function TOTAL_ML_per_hour() { return 330 / 24; } // 13.75 ml/h
 const TOTAL_ML = 330;
 const OBLIGATIONS = [
-  { label: 'Sleeping',           ml: 110 },
   { label: 'Working / studying', ml: 96  },
   { label: 'Commuting',          ml: 14  },
   { label: 'Cooking & cleaning', ml: 21  },
 ];
-const FREE_ML = TOTAL_ML - OBLIGATIONS.reduce((s, o) => s + o.ml, 0); // 89
+const FREE_ML = TOTAL_ML - OBLIGATIONS.reduce((s, o) => s + o.ml, 0); // 199
 
 // =====================================================================
 // LAYOUT CONSTANTS
