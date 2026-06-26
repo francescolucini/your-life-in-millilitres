@@ -6,15 +6,14 @@ import { RGBELoader } from './vendor/RGBELoader.js';
 // =====================================================================
 // MODEL / NUMBERS  (Delft student day — see sidebar for sources)
 // =====================================================================
-const ML_PER_HOUR = TOTAL_ML_per_hour();
-function TOTAL_ML_per_hour() { return 330 / 24; } // 13.75 ml/h
-const TOTAL_ML = 330;
+const TOTAL_ML = 199;                    // waking hours only (330 ml day minus 8 h sleep)
+const ML_PER_HOUR = TOTAL_ML / 16;       // 16 waking hours → ~12.44 ml/h
 const OBLIGATIONS = [
   { label: 'Working / studying', ml: 96  },
   { label: 'Commuting',          ml: 14  },
   { label: 'Cooking & cleaning', ml: 21  },
 ];
-const FREE_ML = TOTAL_ML - OBLIGATIONS.reduce((s, o) => s + o.ml, 0); // 199
+const FREE_ML = TOTAL_ML - OBLIGATIONS.reduce((s, o) => s + o.ml, 0); // 68
 
 // =====================================================================
 // LAYOUT CONSTANTS
@@ -37,7 +36,7 @@ const SPOUT_TIP_Y = 0.9;
 // =====================================================================
 const state = {
   phase: 'idle',          // idle | input | draining | pour_ready | pouring | done
-  screenHours: 5.0,
+  screenHours: 3.5,
   tankMl: TOTAL_ML,
   glassMl: 0,
   queue: [],
@@ -729,8 +728,8 @@ Object.values(stickerImgs).forEach(img => { img.onload = () => { if (paper.visib
 
 function pickSticker() {
   const ml = state.resultRemaining;
-  if (ml > 100) return stickerImgs.green;
-  if (ml >= 30)  return stickerImgs.yellow;
+  if (ml > 40) return stickerImgs.green;
+  if (ml >= 15) return stickerImgs.yellow;
   return stickerImgs.red;
 }
 
@@ -776,6 +775,9 @@ function drawPaperTexture() {
   const sticker = pickSticker();
   const ss = 160;
   if (sticker.complete && sticker.naturalWidth) x.drawImage(sticker, (W - ss) / 2, y, ss, ss);
+  y += ss + 18;
+  x.font = '700 18px "Helvetica Neue", Arial, sans-serif';
+  x.fillText('Take your sticker!', W / 2, y);
   paperTex.needsUpdate = true;
 }
 
@@ -972,7 +974,7 @@ function drawScreen() {
     center('HOW MUCH SCREEN TIME?', 170, 42, '#e8e6e0', '700');
     center('on an average day', 235, 28, '#8a8780', '400');
     const ml = Math.round(state.screenHours * ML_PER_HOUR);
-    drawSlider(UI.slider, state.screenHours / 14, `${state.screenHours.toFixed(1)} h  ·  ${ml} ml`);
+    drawSlider(UI.slider, state.screenHours / 6, `${state.screenHours.toFixed(1)} h  ·  ${ml} ml`);
     drawRectBtn(UI.start, 'START');
   } else if (state.phase === 'draining') {
     center('YOUR LIFE', 80, 26, '#8a8780', '600');
@@ -1215,7 +1217,7 @@ function onSliderB(p, b) { return p.x >= b.x - 30 && p.x <= b.x + b.w + 30 && Ma
 function setSliderFrom(p) {
   const b = UI.slider;
   const f = THREE.MathUtils.clamp((p.x - b.x) / b.w, 0, 1);
-  state.screenHours = Math.round(f * 14 / 0.5) * 0.5;
+  state.screenHours = Math.round(f * 6 / 0.5) * 0.5;
 }
 
 function onDown(ev) {
@@ -1292,6 +1294,7 @@ receiptOverlay.innerHTML = `
     <div class="r-rule"></div>
     <p id="r-msg"></p>
     <img id="r-sticker" alt="sticker" />
+    <p class="r-sticker-cta">Take your sticker!</p>
   </div>
   <div id="receipt-actions">
     <button id="r-print" type="button">Print receipt</button>
